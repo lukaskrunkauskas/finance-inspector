@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: finance-inspector
+Version: 0.1.0
+Requires-Python: >=3.9
+Requires-Dist: pdfplumber
+Requires-Dist: python-dateutil
+Requires-Dist: typer
+Requires-Dist: rich

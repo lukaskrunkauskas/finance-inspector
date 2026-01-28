@@ -1,0 +1,10 @@
+pyproject.toml
+src/finance_inspector/__init__.py
+src/finance_inspector/main.py
+src/finance_inspector.egg-info/PKG-INFO
+src/finance_inspector.egg-info/SOURCES.txt
+src/finance_inspector.egg-info/dependency_links.txt
+src/finance_inspector.egg-info/requires.txt
+src/finance_inspector.egg-info/top_level.txt
+src/finance_inspector/parsing/__init__.py
+src/finance_inspector/parsing/revolut_pdf.py
