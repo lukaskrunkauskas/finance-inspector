@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
-from datetime import date
-from dateutil import parser as dateparser
+
 import pdfplumber
+from dateutil import parser as dateparser
+
+from finance_inspector.models.transaction import Transaction
 
 DATE_RE = re.compile(r"^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4}\b")
 MONEY_RE = re.compile(r"€\s?\d+(?:,\d{3})*(?:\.\d{2})")
@@ -23,16 +24,6 @@ JUNK_PATTERNS = [
     re.compile(r"^©\s*\d{4}\s+Revolut\b", re.I),
     re.compile(r"^Page\s+\d+\s+of\s+\d+\b", re.I),
 ]
-
-@dataclass
-class Transaction:
-    booking_date: date
-    title: str
-    details: str
-    money_out: float | None
-    money_in: float | None
-    balance: float | None
-    currency: str = "EUR"
 
 
 def _eur_to_float(s: str) -> float:
