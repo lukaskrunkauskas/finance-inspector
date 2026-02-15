@@ -38,7 +38,7 @@ def _parse_pdf_bytes(pdf_bytes: bytes) -> list[dict]:
     return txs
 
 
-def _render_category_manager(conn: sqlite3.Connection, selected_statement_id: int | None) -> None:
+def _render_category_manager(conn: sqlite3.Connection, user_id: int, selected_statement_id: int | None) -> None:
     """Render the category management expander."""
     with st.expander("Manage Categories"):
         # --- Create new category ---
@@ -47,7 +47,7 @@ def _render_category_manager(conn: sqlite3.Connection, selected_statement_id: in
             submitted = st.form_submit_button("Create category")
             if submitted and new_name.strip():
                 try:
-                    create_category(conn, new_name.strip())
+                    create_category(conn, new_name.strip(), user_id)
                     st.rerun()
                 except sqlite3.IntegrityError:
                     st.error(f"Category '{new_name.strip()}' already exists.")
@@ -55,7 +55,7 @@ def _render_category_manager(conn: sqlite3.Connection, selected_statement_id: in
         st.divider()
 
         # --- List active categories with keywords ---
-        categories = list_categories(conn, include_deleted=False)
+        categories = list_categories(conn, user_id, include_deleted=False)
         if not categories:
             st.caption("No categories yet. Create one above.")
             return
@@ -85,20 +85,20 @@ def _render_category_manager(conn: sqlite3.Connection, selected_statement_id: in
 
             # Delete category button
             if st.button(f"Delete '{cat.name}'", key=f"del_cat_{cat.id}"):
-                soft_delete_category(conn, cat.id)
+                soft_delete_category(conn, cat.id, user_id)
                 st.rerun()
 
             st.divider()
 
         # --- Deleted categories (restore) ---
-        deleted = [c for c in list_categories(conn, include_deleted=True) if c.deleted_at]
+        deleted = [c for c in list_categories(conn, user_id, include_deleted=True) if c.deleted_at]
         if deleted:
             st.markdown("**Deleted categories**")
             for cat in deleted:
                 col1, col2 = st.columns([3, 1])
                 col1.text(cat.name)
                 if col2.button("Restore", key=f"restore_cat_{cat.id}"):
-                    restore_category(conn, cat.id)
+                    restore_category(conn, cat.id, user_id)
                     st.rerun()
 
         # --- Re-categorize button ---
@@ -109,10 +109,10 @@ def _render_category_manager(conn: sqlite3.Connection, selected_statement_id: in
                 st.rerun()
 
 
-def render_home(conn: sqlite3.Connection) -> None:
+def render_home(conn: sqlite3.Connection, user_id: int) -> None:
     st.title("Finance Inspector")
 
-    saved = list_statements(conn)
+    saved = list_statements(conn, user_id)
 
     with st.sidebar:
         st.header("Statements")
@@ -132,14 +132,14 @@ def render_home(conn: sqlite3.Connection) -> None:
 
     if uploaded is not None:
         pdf_bytes = uploaded.getbuffer().tobytes()
-        statement = upsert_statement(conn, uploaded.name, pdf_bytes)
+        statement = upsert_statement(conn, uploaded.name, pdf_bytes, user_id)
         txs = _parse_pdf_bytes(pdf_bytes)
         replace_transactions(conn, statement.id, txs)
         selected_statement_id = statement.id
 
     if selected_statement_id is None:
         st.info("Upload a PDF or select one from the sidebar.")
-        _render_category_manager(conn, None)
+        _render_category_manager(conn, user_id, None)
         return
 
     # Load transactions from DB — already Transaction objects
@@ -159,7 +159,7 @@ def render_home(conn: sqlite3.Connection) -> None:
 
     if df.empty:
         st.warning("No transactions found for this statement.")
-        _render_category_manager(conn, selected_statement_id)
+        _render_category_manager(conn, user_id, selected_statement_id)
         return
 
     df["date"] = pd.to_datetime(df["date"])
@@ -212,6 +212,44 @@ def render_home(conn: sqlite3.Connection) -> None:
 
     st.altair_chart(chart, use_container_width=True)
 
+    # --- Pie chart: spending by category ---
+    st.subheader("Spending by category")
+
+    cat_df = df.assign(
+        money_out=pd.to_numeric(df["money_out"], errors="coerce").fillna(0),
+    )
+    cat_df = cat_df[cat_df["money_out"] > 0].copy()
+
+    if cat_df.empty:
+        st.caption("No outgoing transactions to categorize.")
+    else:
+        cat_df["category"] = cat_df["category"].fillna("Uncategorized")
+        by_cat = cat_df.groupby("category", as_index=False)["money_out"].sum()
+        by_cat = by_cat.rename(columns={"money_out": "amount"})
+
+        pie = (
+            alt.Chart(by_cat)
+            .mark_arc(innerRadius=50)
+            .encode(
+                theta=alt.Theta("amount:Q"),
+                color=alt.Color("category:N", title="Category"),
+                tooltip=[
+                    alt.Tooltip("category:N", title="Category"),
+                    alt.Tooltip("amount:Q", title="Amount (€)", format=",.2f"),
+                ],
+            )
+            .properties(height=400)
+        )
+
+        col_pie, col_table = st.columns(2)
+        with col_pie:
+            st.altair_chart(pie, use_container_width=True)
+        with col_table:
+            by_cat_display = by_cat.sort_values("amount", ascending=False).copy()
+            by_cat_display["amount"] = by_cat_display["amount"].apply(lambda x: f"€{x:,.2f}")
+            by_cat_display.columns = ["Category", "Amount"]
+            st.dataframe(by_cat_display, use_container_width=True, hide_index=True)
+
     st.subheader("Data")
     st.dataframe(df, use_container_width=True)
 
@@ -222,4 +260,4 @@ def render_home(conn: sqlite3.Connection) -> None:
         mime="text/csv",
     )
 
-    _render_category_manager(conn, selected_statement_id)
+    _render_category_manager(conn, user_id, selected_statement_id)
