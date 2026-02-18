@@ -1,4 +1,3 @@
-# src/finance_inspector/ui/pages/home.py
 from __future__ import annotations
 
 import os
@@ -9,105 +8,159 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+from finance_inspector.models.transaction import Transaction  # noqa: F401 — used for type via cache_data
 from finance_inspector.parsing.revolut_pdf import parse_revolut_statement_pdf
 from finance_inspector.storage.sqlite_db import (
     add_keyword,
     categorize_transactions,
-    create_category,
     list_categories,
-    list_keywords,
     list_statements,
     load_transactions,
-    remove_keyword,
     replace_transactions,
-    restore_category,
-    soft_delete_category,
     upsert_statement,
 )
 
+_TX_PAGE_SIZE = 100
+
+
+# ---------------------------------------------------------------------------
+# PDF parsing (cached)
+# ---------------------------------------------------------------------------
 
 @st.cache_data(show_spinner=False)
-def _parse_pdf_bytes(pdf_bytes: bytes) -> list[dict]:
+def _parse_pdf_bytes(pdf_bytes: bytes) -> list[Transaction]:
     tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
     try:
         tmp.write(pdf_bytes)
         tmp.close()
-        txs = parse_revolut_statement_pdf(tmp.name)
+        return parse_revolut_statement_pdf(tmp.name)
     finally:
         os.unlink(tmp.name)
-    return txs
 
 
-def _render_category_manager(conn: sqlite3.Connection, user_id: int, selected_statement_id: int | None) -> None:
-    """Render the category management expander."""
-    with st.expander("Manage Categories"):
-        # --- Create new category ---
-        with st.form("new_category_form", clear_on_submit=True):
-            new_name = st.text_input("New category name")
-            submitted = st.form_submit_button("Create category")
-            if submitted and new_name.strip():
-                try:
-                    create_category(conn, new_name.strip(), user_id)
-                    st.rerun()
-                except sqlite3.IntegrityError:
-                    st.error(f"Category '{new_name.strip()}' already exists.")
+# ---------------------------------------------------------------------------
+# Category-assignment dialog
+# ---------------------------------------------------------------------------
 
-        st.divider()
+@st.dialog("Assign Category")
+def _assign_category_dialog(conn: sqlite3.Connection, user_id: int) -> None:
+    tx = st.session_state.get("_categorize_tx")
+    if tx is None:
+        st.rerun()
+        return
 
-        # --- List active categories with keywords ---
-        categories = list_categories(conn, user_id, include_deleted=False)
-        if not categories:
-            st.caption("No categories yet. Create one above.")
-            return
+    title: str = tx["title"]
+    statement_id: int = tx["statement_id"]
 
-        for cat in categories:
-            st.markdown(f"**{cat.name}**")
-            keywords = list_keywords(conn, cat.id)
+    st.markdown(f"**Transaction title**")
+    st.code(title, language=None)
 
-            # Show existing keywords with remove buttons
-            if keywords:
-                cols = st.columns([4, 1])
-                for kw in keywords:
-                    cols[0].code(kw.keyword, language=None)
-                    if cols[1].button("X", key=f"rm_kw_{kw.id}"):
-                        remove_keyword(conn, kw.id)
-                        st.rerun()
-            else:
-                st.caption("No keywords yet.")
+    categories = list_categories(conn, user_id, include_deleted=False)
+    if not categories:
+        st.info("No categories yet — create some on the Categories page first.")
+        if st.button("Close"):
+            del st.session_state["_categorize_tx"]
+            st.rerun()
+        return
 
-            # Add keyword form
-            with st.form(f"add_kw_form_{cat.id}", clear_on_submit=True):
-                kw_input = st.text_input("Add keyword", key=f"kw_input_{cat.id}")
-                kw_submitted = st.form_submit_button("Add")
-                if kw_submitted and kw_input.strip():
-                    add_keyword(conn, cat.id, kw_input.strip())
-                    st.rerun()
+    cat_map = {c.name: c.id for c in categories}
+    selected_name = st.selectbox("Category", list(cat_map.keys()))
 
-            # Delete category button
-            if st.button(f"Delete '{cat.name}'", key=f"del_cat_{cat.id}"):
-                soft_delete_category(conn, cat.id, user_id)
-                st.rerun()
+    keyword = st.text_input(
+        "Keyword to match",
+        value=title.lower(),
+        help="This keyword will be added to the category and used to auto-classify transactions.",
+    )
 
-            st.divider()
+    col_apply, col_cancel = st.columns(2)
+    if col_apply.button("Apply", type="primary", use_container_width=True):
+        if keyword.strip():
+            add_keyword(conn, cat_map[selected_name], keyword.strip())
+            categorize_transactions(conn, statement_id)
+        del st.session_state["_categorize_tx"]
+        st.rerun()
 
-        # --- Deleted categories (restore) ---
-        deleted = [c for c in list_categories(conn, user_id, include_deleted=True) if c.deleted_at]
-        if deleted:
-            st.markdown("**Deleted categories**")
-            for cat in deleted:
-                col1, col2 = st.columns([3, 1])
-                col1.text(cat.name)
-                if col2.button("Restore", key=f"restore_cat_{cat.id}"):
-                    restore_category(conn, cat.id, user_id)
-                    st.rerun()
+    if col_cancel.button("Cancel", use_container_width=True):
+        del st.session_state["_categorize_tx"]
+        st.rerun()
 
-        # --- Re-categorize button ---
-        if selected_statement_id is not None:
-            st.divider()
-            if st.button("Re-categorize current statement"):
-                categorize_transactions(conn, selected_statement_id)
-                st.rerun()
 
+# ---------------------------------------------------------------------------
+# Transaction table
+# ---------------------------------------------------------------------------
+
+def _fmt_eur(val) -> str:
+    try:
+        return f"€{float(val):,.2f}" if val is not None else "—"
+    except (TypeError, ValueError):
+        return "—"
+
+
+def _render_tx_table(statement_id: int, df: pd.DataFrame) -> None:
+    total = len(df)
+    n_pages = max(1, -(-total // _TX_PAGE_SIZE))  # ceiling division
+
+    # Reset page when statement changes
+    if st.session_state.get("_tx_table_stmt") != statement_id:
+        st.session_state["_tx_table_stmt"] = statement_id
+        st.session_state["_tx_page"] = 0
+
+    page = st.session_state.get("_tx_page", 0)
+
+    # Pagination controls
+    if n_pages > 1:
+        pc1, pc2, pc3 = st.columns([1, 4, 1])
+        if pc1.button("← Prev", disabled=page == 0, use_container_width=True):
+            st.session_state["_tx_page"] = page - 1
+            st.rerun()
+        pc2.markdown(
+            f"<div style='text-align:center;padding-top:6px'>Page {page + 1} / {n_pages} &nbsp;·&nbsp; {total} rows</div>",
+            unsafe_allow_html=True,
+        )
+        if pc3.button("Next →", disabled=page == n_pages - 1, use_container_width=True):
+            st.session_state["_tx_page"] = page + 1
+            st.rerun()
+
+    page_df = df.iloc[page * _TX_PAGE_SIZE: (page + 1) * _TX_PAGE_SIZE]
+
+    # Column layout: Date | Title | 🏷 | Category | Out | In | Balance
+    col_widths = [1.6, 5, 0.6, 2, 1.4, 1.4, 1.6]
+
+    # Header
+    hcols = st.columns(col_widths)
+    for hcol, label in zip(hcols, ["Date", "Title", "", "Category", "Out (€)", "In (€)", "Balance (€)"]):
+        hcol.markdown(f"**{label}**")
+    st.markdown("<hr style='margin:2px 0 6px 0'>", unsafe_allow_html=True)
+
+    # Rows
+    for row_idx, (_, row) in enumerate(page_df.iterrows()):
+        global_idx = page * _TX_PAGE_SIZE + row_idx
+        rcols = st.columns(col_widths)
+
+        date_val = row["date"]
+        date_str = date_val.strftime("%Y-%m-%d") if hasattr(date_val, "strftime") else str(date_val)
+
+        rcols[0].caption(date_str)
+        indicator = "🔴" if pd.isna(row["money_in"]) else "🟢"
+        rcols[1].caption(row["title"] + " " + indicator)
+
+        if rcols[2].button("🏷️", key=f"cat_btn_{global_idx}", help="Assign category to this title"):
+            st.session_state["_categorize_tx"] = {
+                "title": row["title"],
+                "statement_id": statement_id,
+            }
+
+        rcols[3].caption(row["category"] or "—")
+        money_out_label = "" if pd.isna(row["money_out"]) else _fmt_eur(row["money_out"])
+        rcols[4].caption(money_out_label)
+        money_in_label = "" if pd.isna(row["money_in"]) else _fmt_eur(row["money_in"])
+        rcols[5].caption(money_in_label)
+        rcols[6].caption(_fmt_eur(row["balance"]))
+
+
+# ---------------------------------------------------------------------------
+# Page
+# ---------------------------------------------------------------------------
 
 def render_home(conn: sqlite3.Connection, user_id: int) -> None:
     st.title("Finance Inspector")
@@ -117,15 +170,13 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
     with st.sidebar:
         st.header("Statements")
 
-        selected_statement_id: int | None = None
         if saved:
-            labels = {
-                (s.statement_title or s.filename): s.id
-                for s in saved
-            }
-            selected_statement_id = labels[st.selectbox("Load saved", list(labels.keys()))]
+            labels = {(s.statement_title or s.filename): s.id for s in saved}
+            selected_label = st.selectbox("Load saved", list(labels.keys()))
+            selected_statement_id = labels[selected_label]
         else:
             st.caption("No saved statements yet.")
+            selected_statement_id = st.session_state.get("selected_statement_id")
 
         st.divider()
         uploaded = st.file_uploader("Upload a Revolut statement PDF", type=["pdf"])
@@ -137,12 +188,18 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
         replace_transactions(conn, statement.id, txs)
         selected_statement_id = statement.id
 
+    # Persist for the categories page (re-categorize shortcut)
+    st.session_state["selected_statement_id"] = selected_statement_id
+
+    # Open dialog if a row button was clicked
+    if "_categorize_tx" in st.session_state:
+        _assign_category_dialog(conn, user_id)
+
     if selected_statement_id is None:
         st.info("Upload a PDF or select one from the sidebar.")
-        _render_category_manager(conn, user_id, None)
         return
 
-    # Load transactions from DB — already Transaction objects
+    # Load transactions
     txs = load_transactions(conn, selected_statement_id)
     df = pd.DataFrame([
         {
@@ -159,7 +216,6 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
 
     if df.empty:
         st.warning("No transactions found for this statement.")
-        _render_category_manager(conn, user_id, selected_statement_id)
         return
 
     df["date"] = pd.to_datetime(df["date"])
@@ -173,6 +229,7 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
     c2.metric("Total out", f"€{total_out:,.2f}")
     c3.metric("Total in", f"€{total_in:,.2f}")
 
+    # --- Daily chart ---
     st.subheader("Chart: daily money in/out")
 
     daily = (
@@ -185,7 +242,6 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
         .sum()
     )
     daily["day"] = pd.to_datetime(daily["day"])
-
     daily_long = daily.melt("day", value_vars=["money_out", "money_in"], var_name="type", value_name="amount")
     daily_long["day_str"] = daily_long["day"].dt.strftime("%Y-%m-%d")
 
@@ -209,15 +265,12 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
         )
         .properties(height=360)
     )
-
     st.altair_chart(chart, use_container_width=True)
 
-    # --- Pie chart: spending by category ---
+    # --- Pie chart ---
     st.subheader("Spending by category")
 
-    cat_df = df.assign(
-        money_out=pd.to_numeric(df["money_out"], errors="coerce").fillna(0),
-    )
+    cat_df = df.assign(money_out=pd.to_numeric(df["money_out"], errors="coerce").fillna(0))
     cat_df = cat_df[cat_df["money_out"] > 0].copy()
 
     if cat_df.empty:
@@ -250,14 +303,15 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
             by_cat_display.columns = ["Category", "Amount"]
             st.dataframe(by_cat_display, use_container_width=True, hide_index=True)
 
+    # --- Transaction table ---
     st.subheader("Data")
-    st.dataframe(df, use_container_width=True)
 
+    _render_tx_table(selected_statement_id, df)
+
+    st.divider()
     st.download_button(
         "Download CSV",
         df.assign(date=df["date"].dt.date.astype(str)).to_csv(index=False).encode("utf-8"),
         file_name="transactions.csv",
         mime="text/csv",
     )
-
-    _render_category_manager(conn, user_id, selected_statement_id)

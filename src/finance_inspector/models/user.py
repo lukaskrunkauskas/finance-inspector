@@ -13,3 +13,5 @@ class User:
     last_name: str
     password_hash: str
     created_at: datetime
+    country: str | None = None
+    theme: str = "light"

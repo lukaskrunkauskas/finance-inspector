@@ -5,7 +5,9 @@ import sqlite3
 from datetime import datetime, timezone, date
 from pathlib import Path
 
+from finance_inspector.category_configs import get_config_for_country
 from finance_inspector.models.category import Category, CategoryKeyword
+from finance_inspector.models.enums.category_enum import CategoryEnum
 from finance_inspector.models.statement import Statement
 from finance_inspector.models.transaction import Transaction
 from finance_inspector.models.user import User
@@ -55,7 +57,15 @@ def init_db(conn: sqlite3.Connection) -> None:
             created_at
             TEXT
             NOT
+            NULL,
+            country
+            TEXT,
+            theme
+            TEXT
+            NOT
             NULL
+            DEFAULT
+            'light'
         )
         """
     )
@@ -232,6 +242,16 @@ def init_db(conn: sqlite3.Connection) -> None:
     if "user_id" not in cat_cols:
         conn.execute("ALTER TABLE categories ADD COLUMN user_id INTEGER REFERENCES users(id)")
 
+    # Migration: add country column to users if missing
+    user_cols = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "country" not in user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN country TEXT")
+
+    # Migration: add theme column to users if missing
+    user_cols = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "theme" not in user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT 'light'")
+
     # Commit pending DDL before table rebuilds
     conn.commit()
 
@@ -317,11 +337,13 @@ def register_user(
         first_name: str,
         last_name: str,
         password_hash: str,
+        country: str | None = None,
 ) -> User:
     now = datetime.now(timezone.utc)
     cur = conn.execute(
-        "INSERT INTO users (username, email, first_name, last_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-        (username, email, first_name, last_name, password_hash, now.isoformat()),
+        "INSERT INTO users (username, email, first_name, last_name, password_hash, created_at, country, theme)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, 'light')",
+        (username, email, first_name, last_name, password_hash, now.isoformat(), country),
     )
     conn.commit()
     return User(
@@ -332,12 +354,15 @@ def register_user(
         last_name=last_name,
         password_hash=password_hash,
         created_at=now,
+        country=country,
+        theme="light",
     )
 
 
 def get_user_by_username(conn: sqlite3.Connection, username: str) -> User | None:
     row = conn.execute(
-        "SELECT id, username, email, first_name, last_name, password_hash, created_at FROM users WHERE username = ?",
+        "SELECT id, username, email, first_name, last_name, password_hash, created_at, country, theme"
+        " FROM users WHERE username = ?",
         (username,),
     ).fetchone()
     if not row:
@@ -350,6 +375,8 @@ def get_user_by_username(conn: sqlite3.Connection, username: str) -> User | None
         last_name=row["last_name"],
         password_hash=row["password_hash"],
         created_at=datetime.fromisoformat(row["created_at"]),
+        country=row["country"],
+        theme=row["theme"] or "light",
     )
 
 
@@ -380,6 +407,44 @@ def save_new_user_from_credentials(conn: sqlite3.Connection, credentials: dict, 
         last_name=user_data["last_name"],
         password_hash=user_data["password"],
     )
+
+
+def seed_default_categories(conn: sqlite3.Connection, user_id: int, country: str | None) -> None:
+    """Create default categories + keywords for a newly registered user.
+
+    Uses the country-specific config when available, otherwise falls back to
+    the English base config.  Skips categories that already exist for the user
+    so it is safe to call more than once.
+    """
+    config = get_config_for_country(country or "EN")
+    for member in CategoryEnum:
+        keywords = config.get(member, [])
+        # create_category already guards against duplicates per user
+        try:
+            cat = create_category(conn, member.value, user_id)
+        except sqlite3.IntegrityError:
+            # category already exists — fetch it to add any missing keywords
+            row = conn.execute(
+                "SELECT id FROM categories WHERE name = ? AND user_id = ? AND deleted_at IS NULL",
+                (member.value, user_id),
+            ).fetchone()
+            if row is None:
+                continue
+            cat_id = int(row["id"])
+        else:
+            cat_id = cat.id
+
+        for kw in keywords:
+            conn.execute(
+                "INSERT OR IGNORE INTO category_keywords (category_id, keyword) VALUES (?, ?)",
+                (cat_id, kw.strip().lower()),
+            )
+    conn.commit()
+
+
+def update_user_theme(conn: sqlite3.Connection, user_id: int, theme: str) -> None:
+    conn.execute("UPDATE users SET theme = ? WHERE id = ?", (theme, user_id))
+    conn.commit()
 
 
 # ---------------------------------------------------------------------------
