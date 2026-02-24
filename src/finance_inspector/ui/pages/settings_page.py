@@ -5,7 +5,7 @@ import sqlite3
 import streamlit as st
 
 from finance_inspector.models.user import User
-from finance_inspector.storage.sqlite_db import update_user_theme
+from finance_inspector.storage.repositories.users_repo import update_user_theme
 
 _THEME_OPTIONS = {
     "light": "☀️  Light",

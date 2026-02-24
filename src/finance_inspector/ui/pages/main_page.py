@@ -10,14 +10,18 @@ import streamlit as st
 
 from finance_inspector.models.transaction import Transaction  # noqa: F401 — used for type via cache_data
 from finance_inspector.parsing.revolut_pdf import parse_revolut_statement_pdf
-from finance_inspector.storage.sqlite_db import (
+from finance_inspector.storage.repositories.categories_repo import (
     add_keyword,
-    categorize_transactions,
     list_categories,
+)
+from finance_inspector.storage.repositories.statements_repo import (
     list_statements,
+    upsert_statement,
+)
+from finance_inspector.storage.repositories.transactions_repo import (
+    categorize_transactions,
     load_transactions,
     replace_transactions,
-    upsert_statement,
 )
 
 _TX_PAGE_SIZE = 100
@@ -73,14 +77,14 @@ def _assign_category_dialog(conn: sqlite3.Connection, user_id: int) -> None:
     )
 
     col_apply, col_cancel = st.columns(2)
-    if col_apply.button("Apply", type="primary", use_container_width=True):
+    if col_apply.button("Apply", type="primary", width='content'):
         if keyword.strip():
             add_keyword(conn, cat_map[selected_name], keyword.strip())
             categorize_transactions(conn, statement_id)
         del st.session_state["_categorize_tx"]
         st.rerun()
 
-    if col_cancel.button("Cancel", use_container_width=True):
+    if col_cancel.button("Cancel", width='content'):
         del st.session_state["_categorize_tx"]
         st.rerun()
 
@@ -110,14 +114,14 @@ def _render_tx_table(statement_id: int, df: pd.DataFrame) -> None:
     # Pagination controls
     if n_pages > 1:
         pc1, pc2, pc3 = st.columns([1, 4, 1])
-        if pc1.button("← Prev", disabled=page == 0, use_container_width=True):
+        if pc1.button("← Prev", disabled=page == 0, width='content'):
             st.session_state["_tx_page"] = page - 1
             st.rerun()
         pc2.markdown(
             f"<div style='text-align:center;padding-top:6px'>Page {page + 1} / {n_pages} &nbsp;·&nbsp; {total} rows</div>",
             unsafe_allow_html=True,
         )
-        if pc3.button("Next →", disabled=page == n_pages - 1, use_container_width=True):
+        if pc3.button("Next →", disabled=page == n_pages - 1, width='content'):
             st.session_state["_tx_page"] = page + 1
             st.rerun()
 
@@ -265,7 +269,7 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
         )
         .properties(height=360)
     )
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, width='stretch')
 
     # --- Pie chart ---
     st.subheader("Spending by category")
@@ -296,12 +300,12 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
 
         col_pie, col_table = st.columns(2)
         with col_pie:
-            st.altair_chart(pie, use_container_width=True)
+            st.altair_chart(pie, width='stretch')
         with col_table:
             by_cat_display = by_cat.sort_values("amount", ascending=False).copy()
             by_cat_display["amount"] = by_cat_display["amount"].apply(lambda x: f"€{x:,.2f}")
             by_cat_display.columns = ["Category", "Amount"]
-            st.dataframe(by_cat_display, use_container_width=True, hide_index=True)
+            st.dataframe(by_cat_display, width='content', hide_index=True)
 
     # --- Transaction table ---
     st.subheader("Data")

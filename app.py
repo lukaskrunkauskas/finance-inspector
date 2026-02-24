@@ -2,14 +2,14 @@ import streamlit as st
 import streamlit_authenticator as stauth
 
 from finance_inspector.category_configs import SUPPORTED_COUNTRIES
-from finance_inspector.storage.sqlite_db import (
-    get_conn,
+from finance_inspector.storage.connection import get_conn
+from finance_inspector.storage.repositories.users_repo import (
     get_all_users_credentials,
     get_user_by_username,
-    init_db,
     register_user,
     seed_default_categories,
 )
+from finance_inspector.storage.schema import init_db
 from finance_inspector.ui.pages.categories_page import render_categories
 from finance_inspector.ui.pages.main_page import render_home
 from finance_inspector.ui.pages.settings_page import apply_theme, render_settings
@@ -21,9 +21,9 @@ st.set_page_config(page_title="Finance Inspector", layout="wide")
 # ---------------------------------------------------------------------------
 
 _PAGES = {
-    "home":       ("🏠", "Home"),
+    "home": ("🏠", "Home"),
     "categories": ("🏷️", "Categories"),
-    "settings":   ("⚙️", "Settings"),
+    "settings": ("⚙️", "Settings"),
 }
 
 
@@ -71,7 +71,7 @@ def _sidebar_nav(current_page: str) -> str:
         for col, (key, (icon, label)) in zip(cols, _PAGES.items()):
             btn_type = "primary" if key == current_page else "secondary"
             if col.button(icon, key=f"nav_{key}", help=label,
-                          use_container_width=True, type=btn_type):
+                          width='content', type=btn_type):
                 st.session_state["page"] = key
                 st.rerun()
     return current_page
@@ -88,7 +88,7 @@ credentials = get_all_users_credentials(conn)
 authenticator = stauth.Authenticate(
     credentials,
     cookie_name="fi_auth",
-    cookie_key="finance_inspector_secret_key",
+    cookie_key="finance_inspector_secret_key_v10",
     cookie_expiry_days=30,
 )
 
@@ -99,7 +99,15 @@ authenticator = stauth.Authenticate(
 try:
     authenticator.login()
 except Exception as e:
-    st.error(e)
+    if "Signature verification failed" in str(e):
+        # Stale cookie from a previous key — delete it and reload cleanly
+        try:
+            authenticator.cookie_handler.delete_cookie()
+        except Exception:
+            pass
+        st.rerun()
+    else:
+        st.error(e)
 
 if st.session_state.get("authentication_status"):
     username = st.session_state["username"]

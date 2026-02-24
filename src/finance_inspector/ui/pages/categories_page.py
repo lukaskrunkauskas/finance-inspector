@@ -4,17 +4,17 @@ import sqlite3
 
 import streamlit as st
 
-from finance_inspector.storage.sqlite_db import (
+from finance_inspector.storage.repositories.categories_repo import (
     add_keyword,
-    categorize_transactions,
     create_category,
     list_categories,
     list_keywords,
-    list_statements,
     remove_keyword,
     restore_category,
     soft_delete_category,
 )
+from finance_inspector.storage.repositories.statements_repo import list_statements
+from finance_inspector.storage.repositories.transactions_repo import categorize_transactions
 
 
 def render_categories(conn: sqlite3.Connection, user_id: int) -> None:
@@ -23,8 +23,9 @@ def render_categories(conn: sqlite3.Connection, user_id: int) -> None:
     # --- Create new category ---
     with st.form("new_category_form", clear_on_submit=True):
         col_input, col_btn = st.columns([5, 1])
-        new_name = col_input.text_input("New category name", label_visibility="collapsed", placeholder="New category name")
-        submitted = col_btn.form_submit_button("Create", use_container_width=True)
+        new_name = col_input.text_input("New category name", label_visibility="collapsed",
+                                        placeholder="New category name")
+        submitted = col_btn.form_submit_button("Create", width='content')
         if submitted and new_name.strip():
             try:
                 create_category(conn, new_name.strip(), user_id)
@@ -62,7 +63,7 @@ def render_categories(conn: sqlite3.Connection, user_id: int) -> None:
                         label_visibility="collapsed",
                         placeholder="Add keyword…",
                     )
-                    kw_submitted = add_col.form_submit_button("Add", use_container_width=True)
+                    kw_submitted = add_col.form_submit_button("Add", width='content')
                     if kw_submitted and kw_input.strip():
                         add_keyword(conn, cat.id, kw_input.strip())
                         st.rerun()

@@ -1,0 +1,135 @@
+from __future__ import annotations
+
+from datetime import date
+from sqlite3 import Connection
+
+from finance_inspector.models.transaction import Transaction
+
+
+def _compute_statement_title(txs: list[Transaction]) -> str | None:
+    months = sorted({t.booking_date.strftime("%Y-%m") for t in txs if t.booking_date})
+    if not months:
+        return None
+    if len(months) == 1:
+        return months[0]
+    return f"{months[0]} — {months[-1]}"
+
+
+def replace_transactions(conn: Connection, statement_id: int, txs: list[Transaction]) -> None:
+    conn.execute("DELETE FROM transactions WHERE statement_id = ?", (statement_id,))
+    conn.executemany(
+        """
+        INSERT INTO transactions (statement_id, booking_date, title, details, money_out, money_in, balance, currency)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                statement_id,
+                t.booking_date.isoformat(),
+                t.title,
+                t.details,
+                t.money_out,
+                t.money_in,
+                t.balance,
+                t.currency,
+            )
+            for t in txs
+        ],
+    )
+    statement_title = _compute_statement_title(txs)
+    if statement_title:
+        conn.execute(
+            "UPDATE statements SET statement_title = ? WHERE id = ?",
+            (statement_title, statement_id),
+        )
+    conn.commit()
+    categorize_transactions(conn, statement_id)
+
+
+def load_transactions(conn: Connection, statement_id: int) -> list[Transaction]:
+    rows = conn.execute(
+        """
+        SELECT t.booking_date,
+               t.title,
+               t.details,
+               t.money_out,
+               t.money_in,
+               t.balance,
+               t.currency,
+               c.name AS category
+        FROM transactions t
+                 LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.statement_id = ?
+        ORDER BY t.booking_date ASC, t.id ASC
+        """,
+        (statement_id,),
+    ).fetchall()
+
+    return [
+        Transaction(
+            booking_date=date.fromisoformat(r["booking_date"]),
+            title=r["title"],
+            details=r["details"],
+            money_out=r["money_out"],
+            money_in=r["money_in"],
+            balance=r["balance"],
+            currency=r["currency"],
+            category=r["category"],
+        )
+        for r in rows
+    ]
+
+
+def categorize_transactions(conn: Connection, statement_id: int) -> None:
+    stmt_row = conn.execute(
+        "SELECT user_id FROM statements WHERE id = ?", (statement_id,)
+    ).fetchone()
+    user_id = stmt_row["user_id"] if stmt_row else None
+
+    if user_id is None:
+        conn.execute(
+            "UPDATE transactions SET category_id = NULL WHERE statement_id = ?",
+            (statement_id,),
+        )
+        conn.commit()
+        return
+
+    rows = conn.execute(
+        """
+        SELECT ck.category_id, ck.keyword
+        FROM category_keywords ck
+                 JOIN categories c ON c.id = ck.category_id
+        WHERE c.deleted_at IS NULL
+          AND c.user_id = ?
+        ORDER BY c.name, ck.keyword
+        """,
+        (user_id,),
+    ).fetchall()
+
+    if not rows:
+        conn.execute(
+            "UPDATE transactions SET category_id = NULL WHERE statement_id = ?",
+            (statement_id,),
+        )
+        conn.commit()
+        return
+
+    keyword_map: list[tuple[str, int]] = [(r["keyword"], r["category_id"]) for r in rows]
+
+    txs = conn.execute(
+        "SELECT id, title FROM transactions WHERE statement_id = ?",
+        (statement_id,),
+    ).fetchall()
+
+    for tx in txs:
+        title_lower = tx["title"].lower()
+        matched_category_id = None
+        for keyword, category_id in keyword_map:
+            if keyword in title_lower:
+                matched_category_id = category_id
+                break
+        conn.execute(
+            "UPDATE transactions SET category_id = ? WHERE id = ?",
+            (matched_category_id, tx["id"]),
+        )
+    conn.commit()
