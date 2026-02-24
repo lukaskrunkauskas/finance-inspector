@@ -248,28 +248,32 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
     daily["day"] = pd.to_datetime(daily["day"])
     daily_long = daily.melt("day", value_vars=["money_out", "money_in"], var_name="type", value_name="amount")
     daily_long["day_str"] = daily_long["day"].dt.strftime("%Y-%m-%d")
+    daily_long = daily_long[daily_long["amount"].notna() & (daily_long["amount"] != 0)]
 
-    chart = (
-        alt.Chart(daily_long)
-        .mark_bar()
-        .encode(
-            x=alt.X("day_str:O", title="Day", sort="ascending"),
-            xOffset=alt.XOffset("type:N"),
-            y=alt.Y("amount:Q", title="Amount (€)"),
-            color=alt.Color(
-                "type:N",
-                title="",
-                scale=alt.Scale(domain=["money_out", "money_in"], range=["#d62728", "#2ca02c"]),
-            ),
-            tooltip=[
-                alt.Tooltip("day_str:O", title="Day"),
-                alt.Tooltip("type:N", title="Type"),
-                alt.Tooltip("amount:Q", title="Amount", format=",.2f"),
-            ],
+    if daily_long.empty:
+        st.caption("No chart data available.")
+    else:
+        chart = (
+            alt.Chart(daily_long)
+            .mark_bar()
+            .encode(
+                x=alt.X("day_str:O", title="Day", sort="ascending"),
+                xOffset=alt.XOffset("type:N"),
+                y=alt.Y("amount:Q", title="Amount (€)", stack=False),
+                color=alt.Color(
+                    "type:N",
+                    title="",
+                    scale=alt.Scale(domain=["money_out", "money_in"], range=["#d62728", "#2ca02c"]),
+                ),
+                tooltip=[
+                    alt.Tooltip("day_str:O", title="Day"),
+                    alt.Tooltip("type:N", title="Type"),
+                    alt.Tooltip("amount:Q", title="Amount", format=",.2f"),
+                ],
+            )
+            .properties(height=360)
         )
-        .properties(height=360)
-    )
-    st.altair_chart(chart, width='stretch')
+        st.altair_chart(chart, width='stretch')
 
     # --- Pie chart ---
     st.subheader("Spending by category")
@@ -284,12 +288,23 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
         by_cat = cat_df.groupby("category", as_index=False)["money_out"].sum()
         by_cat = by_cat.rename(columns={"money_out": "amount"})
 
+        color_map = {c.name: c.color for c in list_categories(conn, user_id)}
+        color_map.setdefault("Uncategorized", "#aaaaaa")
+        by_cat["color"] = by_cat["category"].map(color_map).fillna("#aaaaaa")
+
         pie = (
             alt.Chart(by_cat)
             .mark_arc(innerRadius=50)
             .encode(
                 theta=alt.Theta("amount:Q"),
-                color=alt.Color("category:N", title="Category"),
+                color=alt.Color(
+                    "category:N",
+                    title="Category",
+                    scale=alt.Scale(
+                        domain=by_cat["category"].tolist(),
+                        range=by_cat["color"].tolist(),
+                    ),
+                ),
                 tooltip=[
                     alt.Tooltip("category:N", title="Category"),
                     alt.Tooltip("amount:Q", title="Amount (€)", format=",.2f"),
@@ -302,7 +317,7 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
         with col_pie:
             st.altair_chart(pie, width='stretch')
         with col_table:
-            by_cat_display = by_cat.sort_values("amount", ascending=False).copy()
+            by_cat_display = by_cat[["category", "amount"]].sort_values("amount", ascending=False).copy()
             by_cat_display["amount"] = by_cat_display["amount"].apply(lambda x: f"€{x:,.2f}")
             by_cat_display.columns = ["Category", "Amount"]
             st.dataframe(by_cat_display, width='content', hide_index=True)

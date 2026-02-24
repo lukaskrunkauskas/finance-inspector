@@ -4,21 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="31232992-b94c-4937-b004-fd44d3e24a1e" name="Changes" comment="Category enum, category configs for en and lt and updated data table">
-      <change afterPath="$PROJECT_DIR$/src/finance_inspector/storage/connection.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/finance_inspector/storage/migrations.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/finance_inspector/storage/repositories/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/finance_inspector/storage/repositories/categories_repo.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/finance_inspector/storage/repositories/statements_repo.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/finance_inspector/storage/repositories/transactions_repo.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/finance_inspector/storage/repositories/users_repo.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/finance_inspector/storage/schema.py" afterDir="false" />
+    <list default="true" id="31232992-b94c-4937-b004-fd44d3e24a1e" name="Changes" comment="Code cleaup, separating db scripts, queries by entity">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/finance_inspector/storage/sqlite_db.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/finance_inspector/models/category.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/finance_inspector/models/category.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/finance_inspector/models/enums/category_enum.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/finance_inspector/models/enums/category_enum.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/finance_inspector/storage/migrations.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/finance_inspector/storage/migrations.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/finance_inspector/storage/repositories/categories_repo.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/finance_inspector/storage/repositories/categories_repo.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/finance_inspector/storage/repositories/users_repo.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/finance_inspector/storage/repositories/users_repo.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/finance_inspector/ui/pages/categories_page.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/finance_inspector/ui/pages/categories_page.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/finance_inspector/ui/pages/main_page.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/finance_inspector/ui/pages/main_page.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/finance_inspector/ui/pages/settings_page.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/finance_inspector/ui/pages/settings_page.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -187,7 +181,7 @@
       <workItem from="1771343114265" duration="12111000" />
       <workItem from="1771442327577" duration="4939000" />
       <workItem from="1771525791387" duration="2529000" />
-      <workItem from="1771957522570" duration="1985000" />
+      <workItem from="1771957522570" duration="6026000" />
     </task>
     <task id="LOCAL-00001" summary="streamlit init, chart, file upload">
       <option name="closed" value="true" />
@@ -213,7 +207,15 @@
       <option name="project" value="LOCAL" />
       <updated>1771447245734</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Code cleaup, separating db scripts, queries by entity">
+      <option name="closed" value="true" />
+      <created>1771959640389</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1771959640389</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -223,10 +225,11 @@
     <MESSAGE value="streamlit init, chart, file upload" />
     <MESSAGE value="login window and pie chart" />
     <MESSAGE value="Category enum, category configs for en and lt and updated data table" />
-    <option name="LAST_COMMIT_MESSAGE" value="Category enum, category configs for en and lt and updated data table" />
+    <MESSAGE value="Code cleaup, separating db scripts, queries by entity" />
+    <option name="LAST_COMMIT_MESSAGE" value="Code cleaup, separating db scripts, queries by entity" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/finance_inspector$main.coverage" NAME="main Coverage Results" MODIFIED="1771171043018" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src/finance_inspector" />
-    <SUITE FILE_PATH="coverage/finance_inspector$streamlit.coverage" NAME="streamlit Coverage Results" MODIFIED="1771958874513" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="D:\Coding\Projects\Projects\finance-inspector" />
+    <SUITE FILE_PATH="coverage/finance_inspector$streamlit.coverage" NAME="streamlit Coverage Results" MODIFIED="1771963285118" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="D:\Coding\Projects\Projects\finance-inspector" />
   </component>
 </project>

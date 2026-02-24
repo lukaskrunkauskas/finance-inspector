@@ -92,11 +92,11 @@ def seed_default_categories(conn: Connection, user_id: int, country: str | None)
     for member in CategoryEnum:
         keywords = config.get(member, [])
         try:
-            cat = create_category(conn, member.value, user_id)
+            cat = create_category(conn, member.label, user_id, color=member.color)
         except IntegrityError:
             row = conn.execute(
                 "SELECT id FROM categories WHERE name = ? AND user_id = ? AND deleted_at IS NULL",
-                (member.value, user_id),
+                (member.label, user_id),
             ).fetchone()
             if row is None:
                 continue

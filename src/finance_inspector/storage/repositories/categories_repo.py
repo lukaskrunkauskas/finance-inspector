@@ -5,8 +5,21 @@ from sqlite3 import Connection, IntegrityError
 
 from finance_inspector.models.category import Category, CategoryKeyword
 
+_PALETTE = [
+    "#134E8E", "#FFB33F", "#FF4400", "#C00707", "#237227",
+    "#8A7650", "#EB4C4C", "#F1FF5E", "#B500B2", "#F2E3BB",
+    "#3333FF", "#33FF33",
+]
 
-def create_category(conn: Connection, name: str, user_id: int) -> Category:
+
+def _pick_color(conn: Connection, user_id: int) -> str:
+    count = conn.execute(
+        "SELECT COUNT(*) FROM categories WHERE user_id = ?", (user_id,)
+    ).fetchone()[0]
+    return _PALETTE[count % len(_PALETTE)]
+
+
+def create_category(conn: Connection, name: str, user_id: int, color: str | None = None) -> Category:
     existing = conn.execute(
         "SELECT id FROM categories WHERE name = ? AND user_id = ? AND deleted_at IS NULL",
         (name, user_id),
@@ -14,13 +27,19 @@ def create_category(conn: Connection, name: str, user_id: int) -> Category:
     if existing:
         raise IntegrityError(f"Category '{name}' already exists.")
 
+    color = color or _pick_color(conn, user_id)
     now = datetime.now(timezone.utc)
     cur = conn.execute(
-        "INSERT INTO categories (name, created_at, user_id) VALUES (?, ?, ?)",
-        (name, now.isoformat(), user_id),
+        "INSERT INTO categories (name, created_at, user_id, color) VALUES (?, ?, ?, ?)",
+        (name, now.isoformat(), user_id, color),
     )
     conn.commit()
-    return Category(id=int(cur.lastrowid), name=name, created_at=now)
+    return Category(id=int(cur.lastrowid), name=name, color=color, created_at=now)
+
+
+def update_category_color(conn: Connection, category_id: int, color: str) -> None:
+    conn.execute("UPDATE categories SET color = ? WHERE id = ?", (color, category_id))
+    conn.commit()
 
 
 def soft_delete_category(conn: Connection, category_id: int, user_id: int) -> None:
@@ -49,12 +68,12 @@ def list_categories(
 ) -> list[Category]:
     if include_deleted:
         rows = conn.execute(
-            "SELECT id, name, created_at, deleted_at FROM categories WHERE user_id = ? ORDER BY name",
+            "SELECT id, name, color, created_at, deleted_at FROM categories WHERE user_id = ? ORDER BY name",
             (user_id,),
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT id, name, created_at, deleted_at"
+            "SELECT id, name, color, created_at, deleted_at"
             " FROM categories WHERE user_id = ? AND deleted_at IS NULL ORDER BY name",
             (user_id,),
         ).fetchall()
@@ -62,6 +81,7 @@ def list_categories(
         Category(
             id=int(r["id"]),
             name=r["name"],
+            color=r["color"] or "#aaaaaa",
             created_at=datetime.fromisoformat(r["created_at"]),
             deleted_at=datetime.fromisoformat(r["deleted_at"]) if r["deleted_at"] else None,
         )

@@ -8,6 +8,7 @@ from datetime import datetime
 class Category:
     id: int | None
     name: str
+    color: str
     created_at: datetime
     deleted_at: datetime | None = None
 

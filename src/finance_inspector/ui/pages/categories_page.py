@@ -12,6 +12,7 @@ from finance_inspector.storage.repositories.categories_repo import (
     remove_keyword,
     restore_category,
     soft_delete_category,
+    update_category_color,
 )
 from finance_inspector.storage.repositories.statements_repo import list_statements
 from finance_inspector.storage.repositories.transactions_repo import categorize_transactions
@@ -22,13 +23,14 @@ def render_categories(conn: sqlite3.Connection, user_id: int) -> None:
 
     # --- Create new category ---
     with st.form("new_category_form", clear_on_submit=True):
-        col_input, col_btn = st.columns([5, 1])
+        col_input, col_color, col_btn = st.columns([4, 1, 1])
         new_name = col_input.text_input("New category name", label_visibility="collapsed",
                                         placeholder="New category name")
+        new_color = col_color.color_picker("Color", value="#3333FF", label_visibility="collapsed")
         submitted = col_btn.form_submit_button("Create", width='content')
         if submitted and new_name.strip():
             try:
-                create_category(conn, new_name.strip(), user_id)
+                create_category(conn, new_name.strip(), user_id, color=new_color)
                 st.rerun()
             except sqlite3.IntegrityError:
                 st.error(f"Category '{new_name.strip()}' already exists.")
@@ -43,6 +45,18 @@ def render_categories(conn: sqlite3.Connection, user_id: int) -> None:
     else:
         for cat in categories:
             with st.expander(f"**{cat.name}**", expanded=False):
+                st.markdown(
+                    f'<div style="height:4px;background:{cat.color};border-radius:2px;margin-bottom:8px"></div>',
+                    unsafe_allow_html=True,
+                )
+
+                picked = st.color_picker("Color", value=cat.color, key=f"color_{cat.id}")
+                if picked != cat.color:
+                    update_category_color(conn, cat.id, picked)
+                    st.rerun()
+
+                st.divider()
+
                 keywords = list_keywords(conn, cat.id)
 
                 if keywords:

@@ -55,6 +55,12 @@ def run_migrations(conn: Connection) -> None:
         "ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT 'light'",
     )
 
+    apply(
+        "008_color_on_categories",
+        has_col("categories", "color"),
+        "ALTER TABLE categories ADD COLUMN color TEXT NOT NULL DEFAULT '#aaaaaa'",
+    )
+
     _migrate_drop_unique_sha256(conn, applied)
     _migrate_drop_unique_category_name(conn, applied)
 
@@ -86,17 +92,17 @@ def _migrate_drop_unique_sha256(conn: Connection, applied: set[str]) -> None:
         )
         return
     conn.execute("""
-        CREATE TABLE statements_new
-        (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            filename        TEXT NOT NULL,
-            uploaded_at     TEXT NOT NULL,
-            sha256          TEXT NOT NULL,
-            pdf_bytes       BLOB NOT NULL,
-            statement_title TEXT,
-            user_id         INTEGER REFERENCES users (id)
-        )
-    """)
+                 CREATE TABLE statements_new
+                 (
+                     id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                     filename        TEXT NOT NULL,
+                     uploaded_at     TEXT NOT NULL,
+                     sha256          TEXT NOT NULL,
+                     pdf_bytes       BLOB NOT NULL,
+                     statement_title TEXT,
+                     user_id         INTEGER REFERENCES users (id)
+                 )
+                 """)
     conn.execute(
         "INSERT INTO statements_new"
         " SELECT id, filename, uploaded_at, sha256, pdf_bytes, statement_title, user_id"
@@ -120,15 +126,15 @@ def _migrate_drop_unique_category_name(conn: Connection, applied: set[str]) -> N
         )
         return
     conn.execute("""
-        CREATE TABLE categories_new
-        (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            name       TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            deleted_at TEXT,
-            user_id    INTEGER REFERENCES users (id)
-        )
-    """)
+                 CREATE TABLE categories_new
+                 (
+                     id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                     name       TEXT NOT NULL,
+                     created_at TEXT NOT NULL,
+                     deleted_at TEXT,
+                     user_id    INTEGER REFERENCES users (id)
+                 )
+                 """)
     conn.execute(
         "INSERT INTO categories_new SELECT id, name, created_at, deleted_at, user_id FROM categories"
     )
