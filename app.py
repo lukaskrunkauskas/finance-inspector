@@ -14,7 +14,7 @@ from finance_inspector.ui.pages.categories_page import render_categories
 from finance_inspector.ui.pages.main_page import render_home
 from finance_inspector.ui.pages.settings_page import apply_theme, render_settings
 
-st.set_page_config(page_title="Finance Inspector", layout="wide")
+st.set_page_config(page_title="Finance Inspector!", layout="wide")
 
 # ---------------------------------------------------------------------------
 # Helpers
