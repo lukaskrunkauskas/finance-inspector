@@ -1,6 +1,6 @@
 services:
   finance-inspector:
-    image: lukaskrunkauskas/finance-inspector:latest
+    image: colgatroid/finance-inspector:latest
     ports:
       - "8501:8501"
     volumes:
