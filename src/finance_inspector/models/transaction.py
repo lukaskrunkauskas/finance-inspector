@@ -14,3 +14,5 @@ class Transaction:
     balance: float | None
     currency: str = "EUR"
     category: str | None = None
+    irrelevant: bool = False
+    id: int | None = None

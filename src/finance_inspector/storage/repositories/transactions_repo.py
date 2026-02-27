@@ -49,13 +49,15 @@ def replace_transactions(conn: Connection, statement_id: int, txs: list[Transact
 def load_transactions(conn: Connection, statement_id: int) -> list[Transaction]:
     rows = conn.execute(
         """
-        SELECT t.booking_date,
+        SELECT t.id,
+               t.booking_date,
                t.title,
                t.details,
                t.money_out,
                t.money_in,
                t.balance,
                t.currency,
+               t.irrelevant,
                c.name AS category
         FROM transactions t
                  LEFT JOIN categories c ON c.id = t.category_id
@@ -67,6 +69,7 @@ def load_transactions(conn: Connection, statement_id: int) -> list[Transaction]:
 
     return [
         Transaction(
+            id=r["id"],
             booking_date=date.fromisoformat(r["booking_date"]),
             title=r["title"],
             details=r["details"],
@@ -75,9 +78,18 @@ def load_transactions(conn: Connection, statement_id: int) -> list[Transaction]:
             balance=r["balance"],
             currency=r["currency"],
             category=r["category"],
+            irrelevant=bool(r["irrelevant"]),
         )
         for r in rows
     ]
+
+
+def set_transaction_irrelevant(conn: Connection, tx_id: int, value: bool) -> None:
+    conn.execute(
+        "UPDATE transactions SET irrelevant = ? WHERE id = ?",
+        (int(value), tx_id),
+    )
+    conn.commit()
 
 
 def categorize_transactions(conn: Connection, statement_id: int) -> None:

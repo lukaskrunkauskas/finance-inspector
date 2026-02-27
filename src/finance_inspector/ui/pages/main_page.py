@@ -22,6 +22,7 @@ from finance_inspector.storage.repositories.transactions_repo import (
     categorize_transactions,
     load_transactions,
     replace_transactions,
+    set_transaction_irrelevant,
 )
 
 _TX_PAGE_SIZE = 100
@@ -100,7 +101,7 @@ def _fmt_eur(val) -> str:
         return "—"
 
 
-def _render_tx_table(statement_id: int, df: pd.DataFrame) -> None:
+def _render_tx_table(conn: sqlite3.Connection, statement_id: int, df: pd.DataFrame) -> None:
     total = len(df)
     n_pages = max(1, -(-total // _TX_PAGE_SIZE))  # ceiling division
 
@@ -127,39 +128,57 @@ def _render_tx_table(statement_id: int, df: pd.DataFrame) -> None:
 
     page_df = df.iloc[page * _TX_PAGE_SIZE: (page + 1) * _TX_PAGE_SIZE]
 
-    # Column layout: Date | Title | 🏷 | Category | Out | In | Balance
-    col_widths = [1.6, 5, 0.6, 2, 1.4, 1.4, 1.6]
+    # Column layout: Date | Title | 🏷 | 🟡 | Category | Out | In | Balance
+    col_widths = [1.6, 5, 0.4, 0.4, 2.5, 1.4, 1.4, 1.6]
 
     # Header
     hcols = st.columns(col_widths)
-    for hcol, label in zip(hcols, ["Date", "Title", "", "Category", "Out (€)", "In (€)", "Balance (€)"]):
-        hcol.markdown(f"**{label}**")
+    for hcol, label in zip(hcols, ["Date", "Title", "", "", "Category", "Out (€)", "In (€)", "Balance (€)"]):
+        hcol.markdown(f"**{label}**" if label else "")
     st.markdown("<hr style='margin:2px 0 6px 0'>", unsafe_allow_html=True)
 
     # Rows
     for row_idx, (_, row) in enumerate(page_df.iterrows()):
         global_idx = page * _TX_PAGE_SIZE + row_idx
+        is_irrelevant = bool(row["irrelevant"])
+
         rcols = st.columns(col_widths)
 
         date_val = row["date"]
         date_str = date_val.strftime("%Y-%m-%d") if hasattr(date_val, "strftime") else str(date_val)
 
-        rcols[0].caption(date_str)
+        if is_irrelevant:
+            rcols[0].markdown(
+                f'<style>div[data-testid="stHorizontalBlock"]:has(.irr-{global_idx})'
+                f'{{background:rgba(220,50,50,0.1);border-radius:4px}}</style>'
+                f'<span class="irr-{global_idx}" hidden></span>'
+                f'<span style="font-size:0.75rem;color:rgba(49,51,63,0.6)">{date_str}</span>',
+                unsafe_allow_html=True,
+            )
+        else:
+            rcols[0].caption(date_str)
         indicator = "🔴" if pd.isna(row["money_in"]) else "🟢"
         rcols[1].caption(row["title"] + " " + indicator)
 
-        if rcols[2].button("🏷️", key=f"cat_btn_{global_idx}", help="Assign category to this title"):
+        if rcols[2].button("🏷️", key=f"cat_btn_{global_idx}", help="Assign category to this title",
+                           use_container_width=True):
             st.session_state["_categorize_tx"] = {
                 "title": row["title"],
                 "statement_id": statement_id,
             }
 
-        rcols[3].caption(row["category"] or "—")
+        mark_emoji = "🟢" if is_irrelevant else "🟡"
+        mark_help = "Mark as relevant" if is_irrelevant else "Mark as irrelevant"
+        if rcols[3].button(mark_emoji, key=f"mark_btn_{global_idx}", help=mark_help, use_container_width=True):
+            set_transaction_irrelevant(conn, int(row["id"]), not is_irrelevant)
+            st.rerun()
+
+        rcols[4].caption(row["category"] or "—")
         money_out_label = "" if pd.isna(row["money_out"]) else _fmt_eur(row["money_out"])
-        rcols[4].caption(money_out_label)
+        rcols[5].caption(money_out_label)
         money_in_label = "" if pd.isna(row["money_in"]) else _fmt_eur(row["money_in"])
-        rcols[5].caption(money_in_label)
-        rcols[6].caption(_fmt_eur(row["balance"]))
+        rcols[6].caption(money_in_label)
+        rcols[7].caption(_fmt_eur(row["balance"]))
 
 
 # ---------------------------------------------------------------------------
@@ -214,6 +233,8 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
             "money_in": t.money_in,
             "balance": t.balance,
             "category": t.category,
+            "irrelevant": t.irrelevant,
+            "id": t.id,
         }
         for t in txs
     ])
@@ -224,9 +245,10 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
 
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values("date")
+    relevant_df = df[~df["irrelevant"].astype(bool)]
 
-    total_out = float(pd.to_numeric(df["money_out"], errors="coerce").fillna(0).sum())
-    total_in = float(pd.to_numeric(df["money_in"], errors="coerce").fillna(0).sum())
+    total_out = float(pd.to_numeric(relevant_df["money_out"], errors="coerce").fillna(0).sum())
+    total_in = float(pd.to_numeric(relevant_df["money_in"], errors="coerce").fillna(0).sum())
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Transactions", f"{len(df)}")
@@ -237,10 +259,10 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
     st.subheader("Chart: daily money in/out")
 
     daily = (
-        df.assign(
-            day=df["date"].dt.date,
-            money_out=pd.to_numeric(df["money_out"], errors="coerce").fillna(0),
-            money_in=pd.to_numeric(df["money_in"], errors="coerce").fillna(0),
+        relevant_df.assign(
+            day=relevant_df["date"].dt.date,
+            money_out=pd.to_numeric(relevant_df["money_out"], errors="coerce").fillna(0),
+            money_in=pd.to_numeric(relevant_df["money_in"], errors="coerce").fillna(0),
         )
         .groupby("day", as_index=False)[["money_out", "money_in"]]
         .sum()
@@ -278,7 +300,7 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
     # --- Pie chart ---
     st.subheader("Spending by category")
 
-    cat_df = df.assign(money_out=pd.to_numeric(df["money_out"], errors="coerce").fillna(0))
+    cat_df = relevant_df.assign(money_out=pd.to_numeric(relevant_df["money_out"], errors="coerce").fillna(0))
     cat_df = cat_df[cat_df["money_out"] > 0].copy()
 
     if cat_df.empty:
@@ -325,7 +347,7 @@ def render_home(conn: sqlite3.Connection, user_id: int) -> None:
     # --- Transaction table ---
     st.subheader("Data")
 
-    _render_tx_table(selected_statement_id, df)
+    _render_tx_table(conn, selected_statement_id, df)
 
     st.divider()
     st.download_button(

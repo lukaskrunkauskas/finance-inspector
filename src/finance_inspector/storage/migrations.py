@@ -61,6 +61,12 @@ def run_migrations(conn: Connection) -> None:
         "ALTER TABLE categories ADD COLUMN color TEXT NOT NULL DEFAULT '#aaaaaa'",
     )
 
+    apply(
+        "009_add_irrelevant_mark_on_transactions",
+        has_col("transactions", "irrelevant"),
+        "ALTER TABLE transactions ADD COLUMN irrelevant INTEGER NOT NULL DEFAULT 0",
+    )
+
     _migrate_drop_unique_sha256(conn, applied)
     _migrate_drop_unique_category_name(conn, applied)
 

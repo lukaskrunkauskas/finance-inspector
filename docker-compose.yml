@@ -1,3 +1,7 @@
+#pulls the latest image from docker hub
+#Maps port 8501 on the host → 8501 in the container
+#Mounts ./data from the host into /app/data in the container — this is
+#  how the SQLite database and uploaded PDFs survive container restarts
 services:
   finance-inspector:
     image: colgatroid/finance-inspector:latest
