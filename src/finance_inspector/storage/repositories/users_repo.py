@@ -39,7 +39,7 @@ def register_user(
 
 def get_user_by_username(conn: Connection, username: str) -> User | None:
     row = conn.execute(
-        "SELECT id, username, email, first_name, last_name, password_hash, created_at, country, theme"
+        "SELECT id, username, email, first_name, last_name, password_hash, created_at, country, theme, default_view"
         " FROM users WHERE username = ?",
         (username,),
     ).fetchone()
@@ -55,6 +55,7 @@ def get_user_by_username(conn: Connection, username: str) -> User | None:
         created_at=datetime.fromisoformat(row["created_at"]),
         country=row["country"],
         theme=row["theme"] or "light",
+        default_view=row["default_view"] or "all_latest",
     )
 
 
@@ -114,4 +115,9 @@ def seed_default_categories(conn: Connection, user_id: int, country: str | None)
 
 def update_user_theme(conn: Connection, user_id: int, theme: str) -> None:
     conn.execute("UPDATE users SET theme = ? WHERE id = ?", (theme, user_id))
+    conn.commit()
+
+
+def update_user_default_view(conn: Connection, user_id: int, default_view: str) -> None:
+    conn.execute("UPDATE users SET default_view = ? WHERE id = ?", (default_view, user_id))
     conn.commit()

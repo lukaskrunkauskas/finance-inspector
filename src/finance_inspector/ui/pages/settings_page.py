@@ -5,11 +5,17 @@ import sqlite3
 import streamlit as st
 
 from finance_inspector.models.user import User
-from finance_inspector.storage.repositories.users_repo import update_user_theme
+from finance_inspector.storage.repositories.users_repo import update_user_default_view, update_user_theme
 
 _THEME_OPTIONS = {
     "light": "☀️  Light",
     "dark": "🌙  Dark",
+}
+
+_DEFAULT_VIEW_OPTIONS = {
+    "all_latest": "All latest statements (Revolut + Swedbank)",
+    "revolut_latest": "Latest Revolut statement only",
+    "swedbank_latest": "Latest Swedbank statement only",
 }
 
 DARK_CSS = """
@@ -68,7 +74,21 @@ def render_settings(conn: sqlite3.Connection, user: User) -> None:
     )
     chosen_key = keys[labels.index(chosen_label)]
 
+    st.subheader("Default startup view")
+
+    current_view = user.default_view or "all_latest"
+    view_labels = list(_DEFAULT_VIEW_OPTIONS.values())
+    view_keys = list(_DEFAULT_VIEW_OPTIONS.keys())
+
+    chosen_view_label = st.radio(
+        "On startup, automatically select",
+        view_labels,
+        index=view_keys.index(current_view) if current_view in view_keys else 0,
+    )
+    chosen_view_key = view_keys[view_labels.index(chosen_view_label)]
+
     if st.button("Save", type="primary"):
         update_user_theme(conn, user.id, chosen_key)
-        st.success("Theme saved.")
+        update_user_default_view(conn, user.id, chosen_view_key)
+        st.success("Settings saved.")
         st.rerun()

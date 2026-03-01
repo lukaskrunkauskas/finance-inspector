@@ -127,7 +127,7 @@ if st.session_state.get("authentication_status"):
 
     # Render the current page (may add its own sidebar content)
     if page == "home":
-        render_home(conn, user.id)
+        render_home(conn, user.id, user=user)
     elif page == "categories":
         render_categories(conn, user.id)
     elif page == "settings":

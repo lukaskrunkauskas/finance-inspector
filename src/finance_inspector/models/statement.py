@@ -11,3 +11,4 @@ class Statement:
     uploaded_at: datetime
     sha256: str
     statement_title: str | None = None
+    source: str | None = None

@@ -67,6 +67,18 @@ def run_migrations(conn: Connection) -> None:
         "ALTER TABLE transactions ADD COLUMN irrelevant INTEGER NOT NULL DEFAULT 0",
     )
 
+    apply(
+        "010_source_on_statements",
+        has_col("statements", "source"),
+        "ALTER TABLE statements ADD COLUMN source TEXT",
+    )
+
+    apply(
+        "011_default_view_on_users",
+        has_col("users", "default_view"),
+        "ALTER TABLE users ADD COLUMN default_view TEXT NOT NULL DEFAULT 'all_latest'",
+    )
+
     _migrate_drop_unique_sha256(conn, applied)
     _migrate_drop_unique_category_name(conn, applied)
 

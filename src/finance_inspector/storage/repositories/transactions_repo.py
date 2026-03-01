@@ -6,15 +6,6 @@ from sqlite3 import Connection
 from finance_inspector.models.transaction import Transaction
 
 
-def _compute_statement_title(txs: list[Transaction]) -> str | None:
-    months = sorted({t.booking_date.strftime("%Y-%m") for t in txs if t.booking_date})
-    if not months:
-        return None
-    if len(months) == 1:
-        return months[0]
-    return f"{months[0]} — {months[-1]}"
-
-
 def replace_transactions(conn: Connection, statement_id: int, txs: list[Transaction]) -> None:
     conn.execute("DELETE FROM transactions WHERE statement_id = ?", (statement_id,))
     conn.executemany(
@@ -36,12 +27,6 @@ def replace_transactions(conn: Connection, statement_id: int, txs: list[Transact
             for t in txs
         ],
     )
-    statement_title = _compute_statement_title(txs)
-    if statement_title:
-        conn.execute(
-            "UPDATE statements SET statement_title = ? WHERE id = ?",
-            (statement_title, statement_id),
-        )
     conn.commit()
     categorize_transactions(conn, statement_id)
 

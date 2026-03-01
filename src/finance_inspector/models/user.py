@@ -15,3 +15,4 @@ class User:
     created_at: datetime
     country: str | None = None
     theme: str = "light"
+    default_view: str = "all_latest"
