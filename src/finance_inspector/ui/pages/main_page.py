@@ -96,6 +96,51 @@ def _backfill_statement_labels(conn: sqlite3.Connection, saved: list) -> bool:
     return updated
 
 
+_MOBILE_CSS = """
+<style>
+/* ── Mobile / compact responsive tweaks ─────────────────────────── */
+@media (max-width: 768px) {
+    /* Tighten the main content padding */
+    .block-container {
+        padding-top: 0.75rem !important;
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    /* Shrink metric values slightly so 3 fit in one row */
+    [data-testid="stMetricValue"]  { font-size: 1.1rem !important; }
+    [data-testid="stMetricLabel"]  { font-size: 0.75rem !important; }
+    [data-testid="stMetricDelta"]  { font-size: 0.7rem !important; }
+    /* Altair/Vega charts — prevent horizontal overflow */
+    .vega-embed { max-width: 100% !important; }
+}
+</style>
+"""
+
+
+def _render_compact_table(df: pd.DataFrame, show_source: bool) -> None:
+    display = df[["date", "title"] + (["source"] if show_source else []) +
+                 ["money_out", "money_in", "balance", "category"]].copy()
+    display["date"] = display["date"].dt.date
+
+    rename = {
+        "date": "Date", "title": "Title", "source": "Source",
+        "money_out": "Out (€)", "money_in": "In (€)",
+        "balance": "Balance (€)", "category": "Category",
+    }
+    display = display.rename(columns=rename)
+
+    st.dataframe(
+        display,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Out (€)": st.column_config.NumberColumn("Out (€)", format="€%.2f"),
+            "In (€)": st.column_config.NumberColumn("In (€)", format="€%.2f"),
+            "Balance (€)": st.column_config.NumberColumn("Balance (€)", format="€%.2f"),
+        },
+    )
+
+
 def _default_statement_ids(saved: list, default_view: str) -> list[int]:
     if not saved:
         return []
@@ -290,6 +335,8 @@ def _render_tx_table(
 def render_home(conn: sqlite3.Connection, user_id: int, user: User | None = None) -> None:
     st.title("Finance Inspector")
 
+    st.markdown(_MOBILE_CSS, unsafe_allow_html=True)
+
     default_view = (user.default_view or "all_latest") if user else "all_latest"
 
     saved = list_statements(conn, user_id)
@@ -332,6 +379,14 @@ def render_home(conn: sqlite3.Connection, user_id: int, user: User | None = None
         else:
             st.caption("No saved statements yet.")
             selected_statement_ids = []
+
+        st.divider()
+        st.toggle(
+            "Compact view",
+            value=st.session_state.get("_compact_view", True),
+            help="On: scrollable table (recommended on mobile). Off: interactive table with category & relevance controls (desktop).",
+            key="_compact_view",
+        )
 
         st.divider()
         uploaded = st.file_uploader("Upload a statement PDF", type=["pdf"])
@@ -484,19 +539,30 @@ def render_home(conn: sqlite3.Connection, user_id: int, user: User | None = None
             .properties(height=400)
         )
 
-        col_pie, col_table = st.columns(2)
-        with col_pie:
+        compact_view = st.session_state.get("_compact_view", True)
+        if compact_view:
             st.altair_chart(pie, width='stretch')
-        with col_table:
             by_cat_display = by_cat[["category", "amount"]].sort_values("amount", ascending=False).copy()
             by_cat_display["amount"] = by_cat_display["amount"].apply(lambda x: f"€{x:,.2f}")
             by_cat_display.columns = ["Category", "Amount"]
-            st.dataframe(by_cat_display, width='content', hide_index=True)
+            st.dataframe(by_cat_display, use_container_width=True, hide_index=True)
+        else:
+            col_pie, col_table = st.columns(2)
+            with col_pie:
+                st.altair_chart(pie, width='stretch')
+            with col_table:
+                by_cat_display = by_cat[["category", "amount"]].sort_values("amount", ascending=False).copy()
+                by_cat_display["amount"] = by_cat_display["amount"].apply(lambda x: f"€{x:,.2f}")
+                by_cat_display.columns = ["Category", "Amount"]
+                st.dataframe(by_cat_display, width='content', hide_index=True)
 
     # --- Transaction table ---
     st.subheader("Data")
 
-    _render_tx_table(conn, selected_statement_ids, df, show_source=show_source)
+    if st.session_state.get("_compact_view", True):
+        _render_compact_table(df, show_source)
+    else:
+        _render_tx_table(conn, selected_statement_ids, df, show_source=show_source)
 
     st.divider()
     st.download_button(

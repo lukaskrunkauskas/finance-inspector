@@ -4,15 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="31232992-b94c-4937-b004-fd44d3e24a1e" name="Changes" comment="watchtower test">
-      <change afterPath="$PROJECT_DIR$/src/finance_inspector/parsing/swedbank_pdf.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.github/workflows/docker-publish.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/docker-publish.yml" afterDir="false" />
+    <list default="true" id="31232992-b94c-4937-b004-fd44d3e24a1e" name="Changes" comment="can upload swedbank statements now, also fixed statement selector">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/Dockerfile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/finance_inspector/models/transaction.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/finance_inspector/models/transaction.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/finance_inspector/storage/migrations.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/finance_inspector/storage/migrations.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/finance_inspector/storage/repositories/transactions_repo.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/finance_inspector/storage/repositories/transactions_repo.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/finance_inspector/ui/pages/main_page.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/finance_inspector/ui/pages/main_page.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -56,37 +49,37 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.main.executor": "Debug",
-    "Python.streamlit.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "main",
-    "last_opened_file_path": "D:/Coding/Projects/Projects/finance-inspector/src/finance_inspector/storage",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "sql.codeStylePanel.last.previewDialect": "SQLite",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.main.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.streamlit.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/Coding/Projects/Projects/finance-inspector&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;sql.codeStylePanel.last.previewDialect&quot;: &quot;SQLite&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "DatabaseDriversLRU": [
-      "sqlite"
+  &quot;keyToStringList&quot;: {
+    &quot;DatabaseDriversLRU&quot;: [
+      &quot;sqlite&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\Coding\Projects\Projects\finance-inspector" />
       <recent name="D:\Coding\Projects\Projects\finance-inspector\src\finance_inspector\storage" />
       <recent name="D:\Coding\Projects\Projects\finance-inspector\src\finance_inspector\ui\pages" />
-      <recent name="D:\Coding\Projects\Projects\finance-inspector" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="D:\Coding\Projects\Projects\finance-inspector\src\finance_inspector" />
@@ -184,6 +177,8 @@
       <workItem from="1771525791387" duration="2529000" />
       <workItem from="1771957522570" duration="6026000" />
       <workItem from="1772199902311" duration="6517000" />
+      <workItem from="1772264711752" duration="19158000" />
+      <workItem from="1772376377977" duration="11786000" />
     </task>
     <task id="LOCAL-00001" summary="streamlit init, chart, file upload">
       <option name="closed" value="true" />
@@ -241,7 +236,31 @@
       <option name="project" value="LOCAL" />
       <updated>1772046652208</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="corrected watchtower image publisher">
+      <option name="closed" value="true" />
+      <created>1772265428400</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1772265428400</updated>
+    </task>
+    <task id="LOCAL-00009" summary="Removed &quot;!&quot; from page title">
+      <option name="closed" value="true" />
+      <created>1772266032319</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1772266032319</updated>
+    </task>
+    <task id="LOCAL-00010" summary="can upload swedbank statements now, also fixed statement selector">
+      <option name="closed" value="true" />
+      <created>1772387055677</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1772387055677</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -255,10 +274,13 @@
     <MESSAGE value="added docker configs #2" />
     <MESSAGE value="fixed docker configs" />
     <MESSAGE value="watchtower test" />
-    <option name="LAST_COMMIT_MESSAGE" value="watchtower test" />
+    <MESSAGE value="corrected watchtower image publisher" />
+    <MESSAGE value="Removed &quot;!&quot; from page title" />
+    <MESSAGE value="can upload swedbank statements now, also fixed statement selector" />
+    <option name="LAST_COMMIT_MESSAGE" value="can upload swedbank statements now, also fixed statement selector" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/finance_inspector$main.coverage" NAME="main Coverage Results" MODIFIED="1771171043018" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src/finance_inspector" />
-    <SUITE FILE_PATH="coverage/finance_inspector$streamlit.coverage" NAME="streamlit Coverage Results" MODIFIED="1772206434969" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="D:\Coding\Projects\Projects\finance-inspector" />
+    <SUITE FILE_PATH="coverage/finance_inspector$streamlit.coverage" NAME="streamlit Coverage Results" MODIFIED="1772388998892" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="D:\Coding\Projects\Projects\finance-inspector" />
   </component>
 </project>
